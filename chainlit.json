@@ -1,0 +1,28 @@
+{
+  "name": "Excel Assistant",
+  "description": "An AI assistant that helps you work with Excel files",
+  "auth": {
+    "enabled": true,
+    "providers": ["credentials"]
+  },
+  "features": {
+    "starters": true
+  },
+  "ui": {
+    "primaryColor": "#4CAF50",
+    "accentColor": "#2196F3",
+    "backgroundColor": "#FFFFFF",
+    "secondaryBackgroundColor": "#F5F5F5",
+    "chatTitle": "Excel Assistant",
+    "theme": "light",
+    "layout": "wide",
+    "avatars": {
+      "user": "/public/user-avatar.png",
+      "assistant": "/public/assistant-avatar.jpg"
+    }
+  },
+  "dataPersistence": {
+    "enabled": true,
+    "chatHistory": true
+  }
+}

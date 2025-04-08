@@ -1,0 +1,130 @@
+/* Main theme colors */
+:root {
+  --primary-color: #4F46E5;
+  --primary-color-dark: #3c35b5;
+  --primary-color-light: #e8e7fa;
+  --accent-color: #7C3AED;
+  --accent-color-light: #ede7fa;
+  --background-color: #FAFAFA;
+  --paper-color: #FFFFFF;
+  --text-color: #333333;
+}
+
+/* Dark mode colors */
+.dark-mode {
+  --background-color: #121212;
+  --paper-color: #1E1E1E;
+  --text-color: #F5F5F5;
+}
+
+/* Header styling */
+.cl-header {
+  background-color: var(--primary-color);
+}
+
+.cl-header-title {
+  color: white;
+  font-weight: bold;
+}
+
+/* Message bubbles */
+.cl-message-bubble {
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.cl-message-bubble[data-sender="user"] {
+  background-color: var(--primary-color-light);
+  border: 1px solid var(--primary-color);
+}
+
+.cl-message-bubble[data-sender="assistant"] {
+  background-color: var(--paper-color);
+  border: 1px solid #e0e0e0;
+}
+
+/* Avatar styling */
+.cl-avatar-user img, .cl-avatar-assistant img {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Input area styling */
+.cl-input-box {
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.cl-input-box:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+}
+
+/* Button styling */
+.cl-button {
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.cl-button:hover {
+  background-color: var(--primary-color-dark);
+}
+
+/* Chat title */
+.cl-chat-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+/* Code blocks */
+.cl-code-block {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.dark-mode .cl-code-block {
+  background-color: #2a2a2a;
+  border-left: 3px solid var(--primary-color);
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Animations for messages */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cl-message {
+  animation: fadeIn 0.3s ease-out;
+}
