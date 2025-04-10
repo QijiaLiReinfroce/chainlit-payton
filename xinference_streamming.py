@@ -31,61 +31,80 @@ async def query_local_llm():
         print(f"Stream dir: {dir(stream)}")
         print("=== END STREAM OBJECT ===\n")
         
-        # Flag to track if we've exited the thinking step
-        thinking_completed = False
+        # Initialize state and collectors
+        STATE_PRE_THINKING = 0
+        STATE_THINKING_TAG = 1
+        STATE_POST_THINKING = 2
+        current_state = STATE_PRE_THINKING
+        
         collected_reasoning = ""
         collected_content = ""
 
         start = time_module.time()
 
-        print("thinking start =====================")
+        print("Reasoning: ")
         
-        # Streaming the thinking phase
+        # Process the stream chunk by chunk
         async for chunk in stream:
-            # Print the first chunk to understand its structure
-            if not thinking_completed and not collected_reasoning:
-                print("\n=== FIRST CHUNK OBJECT (THINKING) ===")
-                print(f"Chunk type: {type(chunk)}")
-                print(f"Chunk dir: {dir(chunk)}")
-                print(f"Chunk repr: {repr(chunk)}")
-                print(f"Chunk choices: {chunk.choices}")
-                print(f"Chunk delta type: {type(chunk.choices[0].delta)}")
-                print(f"Chunk delta dir: {dir(chunk.choices[0].delta)}")
-                print(f"Chunk delta repr: {repr(chunk.choices[0].delta)}")
-                print("=== END FIRST CHUNK OBJECT ===\n")
-            
             delta = chunk.choices[0].delta
-            
-            # Try to get reasoning_content (if available in the model's response)
-            reasoning_content = getattr(delta, "reasoning_content", None)
-            
-            # Print reasoning content for debugging
-            print(reasoning_content, end="", flush=True)
-            
-            if reasoning_content is not None and not thinking_completed:
-                collected_reasoning += reasoning_content
-            else:
-                # If no reasoning_content is found, check for regular content
-                content = getattr(delta, "content", None)
+            content_chunk = getattr(delta, "content", None)
+
+            if content_chunk:
+                remaining_chunk = content_chunk
                 
-                # If this is the first content after reasoning (or if no reasoning at all)
-                if content is not None and not thinking_completed:
-                    # Exit the thinking step
-                    thought_for = round(time_module.time() - start)
-                    print(f"\nThought for {thought_for}s")
-                    thinking_completed = True
-                    print("\nthinking end =====================")
-                    print("\nfinal answer start =====================")
-                
-                # Print and collect content
-                if content is not None:
-                    print(content, end="", flush=True)
-                    collected_content += content
+                while remaining_chunk:
+                    if current_state == STATE_PRE_THINKING:
+                        if '<' in remaining_chunk:
+                            parts = remaining_chunk.split('<', 1)
+                            reasoning_part = parts[0]
+                            if reasoning_part:
+                                print(reasoning_part, end="", flush=True)
+                                collected_reasoning += reasoning_part
+                            current_state = STATE_THINKING_TAG
+                            remaining_chunk = parts[1]
+                        else:
+                            print(remaining_chunk, end="", flush=True)
+                            collected_reasoning += remaining_chunk
+                            remaining_chunk = ""
+                            
+                    elif current_state == STATE_THINKING_TAG:
+                        if '>' in remaining_chunk:
+                            parts = remaining_chunk.split('>', 1)
+                            current_state = STATE_POST_THINKING
+                            remaining_chunk = parts[1]
+                            # Mark thinking end
+                            thought_for = round(time_module.time() - start)
+                            print(f"\n\nThought for {thought_for}s")
+                            print("\nFinal Answer: ")
+                        else:
+                            # Ignore content within tags
+                            remaining_chunk = ""
+                            
+                    elif current_state == STATE_POST_THINKING:
+                        print(remaining_chunk, end="", flush=True)
+                        collected_content += remaining_chunk
+                        remaining_chunk = ""
         
-        print("\nfinal answer end =====================")
+        # Final print statements if needed
+        if current_state == STATE_PRE_THINKING:
+            # If no tags were found, maybe mark thinking end here?
+            thought_for = round(time_module.time() - start)
+            print(f"\n\nThought for {thought_for}s (No tags found)")
+            print("\nFinal Answer: ")
+        elif current_state == STATE_THINKING_TAG:
+             # Stream ended while inside tags?
+             thought_for = round(time_module.time() - start)
+             print(f"\n\nThought for {thought_for}s (Stream ended unexpectedly)")
+             print("\nFinal Answer: ")
+        
+        print("\n\n--- Stream End ---")
         
         # Print the final collected content
-        print("\n\n=== FINAL COLLECTED CONTENT ===")
+        print("\n=== FINAL COLLECTED REASONING ===")
+        print(collected_reasoning)
+        print("=== END FINAL COLLECTED REASONING ===")
+        
+        print("\n=== FINAL COLLECTED CONTENT ===")
         print(collected_content)
         print("=== END FINAL COLLECTED CONTENT ===")
 
