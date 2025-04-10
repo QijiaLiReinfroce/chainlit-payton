@@ -153,11 +153,13 @@ async def on_chat_resume(thread):
             base_url="https://api.deepseek.com"
         ))
         
+
+
         # Initialize a new agent object (but not activate it yet)
         # Setup the LLM with DeepSeek API
         llm = ChatOpenAI(
             temperature=0,
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             streaming=True,
             openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
             openai_api_base="https://api.deepseek.com"
@@ -264,7 +266,7 @@ async def on_chat_start():
     # Setup the LLM with DeepSeek API
     llm = ChatOpenAI(
         temperature=0,
-        model="deepseek-chat",
+        model="deepseek-reasoner",
         streaming=True,
         openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
         openai_api_base="https://api.deepseek.com"
@@ -514,7 +516,7 @@ async def on_message(message: cl.Message):
         
         # Update the message with the response
         msg.content = response
-        await msg.update()
+        await msg.send()
     else:
         # In regular chat mode, use a more sophisticated approach based on deepseek_api.py
         
@@ -567,7 +569,6 @@ async def on_message(message: cl.Message):
         
         # Add the current user message to chat history
         chat_history.append({"role": "user", "content": message.content})
-        print("fuckfuckfuckfuck: \n\n"+message.content)
         cl.user_session.set("chat_history", chat_history)
         
         try:
@@ -590,59 +591,102 @@ async def on_message(message: cl.Message):
             
             messages.extend(formatted_history)
             
-            # Stream the response from the API
-            stream = await client.chat.completions.create(
-                model="deepseek-reasoner",
-                messages=messages,
-                temperature=0.7,
-                stream=True
-            )
+            # Convert messages to a prompt string for DifyStreamer
+            prompt_parts = []
+            for msg in messages:
+                prompt_parts.append(f"{msg['role'].capitalize()}: {msg['content']}")
             
-            # Flag to track if we've exited the thinking step
+            prompt = "\n".join(prompt_parts)
+            
+            # Initialize state variables
             thinking_completed = False
             collected_reasoning = ""
             collected_content = ""
+            accumulated_chunk = ""
 
             import time as time_module
             start = time_module.time()
 
-            # Streaming the thinking
-            async with cl.Step(name="Thinking") as thinking_step:
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta
-                    reasoning_content = getattr(delta, "reasoning_content", None)
-                    if reasoning_content is not None and not thinking_completed:
-                        collected_reasoning += reasoning_content
-                        await thinking_step.stream_token(reasoning_content)
-                    elif not thinking_completed:
-                        # Exit the thinking step
-                        thought_for = round(time_module.time() - start)
-                        thinking_step.name = f"Thought for {thought_for}s"
-                        await thinking_step.update()
-                        thinking_completed = True
-                        break
-
+            print("thinking start =====================")
+            
             # Create an empty message for the final answer
             final_answer = cl.Message(content="")
-
-            # Streaming the final answer
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
-                content = getattr(delta, "content", None)
-                if content is not None:  # Handle empty strings
-                    collected_content += content
-                    await final_answer.stream_token(content)
-
+            
+            # Import and initialize DifyStreamer
+            from dify_streamer import DifyStreamer
+            
+            # Initialize the DifyStreamer client
+            dify_client = DifyStreamer(
+                api_key="local",
+                base_url="http://172.23.5.34:9997/v1"
+            )
+            
+            # Streaming the thinking and final answer
+            async with cl.Step(name="Thinking") as thinking_step:
+                # Process the response in chunks
+                for chunk in dify_client.generate_stream(prompt, {"temperature": 0.7, "max_tokens": 5000}):
+                    # Print the first few chunks to understand their structure
+                    if len(collected_reasoning) < 50 and len(collected_content) < 50:
+                        print(f"\nCHUNK: '{chunk}'")
+                    
+                    # Accumulate the chunk
+                    accumulated_chunk += chunk
+                    
+                    # Handle thinking phase
+                    if not thinking_completed:
+                        # Check for thinking end marker
+                        if "</think>" in accumulated_chunk:
+                            thinking_completed = True
+                            
+                            # Split the accumulated chunk at the </think> tag
+                            parts = accumulated_chunk.split("</think>", 1)
+                            
+                            # Add the final part of thinking content (excluding <think> tag)
+                            thinking_content = parts[0].replace("<think>", "")
+                            if thinking_content:
+                                collected_reasoning += thinking_content
+                                await thinking_step.stream_token(thinking_content)
+                            
+                            # Exit the thinking step
+                            thought_for = round(time_module.time() - start)
+                            thinking_step.name = f"Thought for {thought_for}s"
+                            await thinking_step.update()
+                            
+                            # Reset accumulated chunk to content after </think>
+                            accumulated_chunk = parts[1] if len(parts) > 1 else ""
+                            
+                            # If there's content after </think>, add it to final answer
+                            if accumulated_chunk:
+                                collected_content += accumulated_chunk
+                                await final_answer.stream_token(accumulated_chunk)
+                                accumulated_chunk = ""
+                            
+                            print("\nthinking end =====================")
+                        else:
+                            # Still in thinking phase, stream the chunk
+                            # Skip the <think> tag if present
+                            if "<think>" in chunk:
+                                chunk = chunk.replace("<think>", "")
+                            
+                            collected_reasoning += chunk
+                            await thinking_step.stream_token(chunk)
+                    else:
+                        # We're in the final answer phase
+                        collected_content += chunk
+                        await final_answer.stream_token(chunk)
+            
+            print("\nfinal answer end =====================")
+            
             # Send the final message after all streaming is complete
             await final_answer.send()
-
+            
             # Add the assistant's response to chat history
             chat_history.append({"role": "assistant", "content": collected_content})
-
+            
             # Keep only the last 20 messages to avoid context length issues
             if len(chat_history) > 20:
                 chat_history = chat_history[-20:]
-
+            
             # Save updated chat history
             cl.user_session.set("chat_history", chat_history)
 
